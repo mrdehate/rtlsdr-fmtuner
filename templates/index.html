@@ -1,0 +1,1251 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>FM Radio Tuner</title>
+    <style>
+        :root {
+            --bg: #111214;
+            --surface: #1c1e22;
+            --surface2: #252830;
+            --border: #333642;
+            --accent: #00e676;
+            --accent-dim: #00a854;
+            --text: #e0e0e0;
+            --muted: #888;
+            --warn: #ff9800;
+            --error: #f44336;
+            --mono-badge: #1565c0;
+            --wfm-badge: #6a0080;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        h1 { color: var(--accent); font-size: 20px; letter-spacing: 2px; text-align: center; margin-bottom: 20px; }
+
+        .two-col {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            gap: 16px;
+            width: 100%;
+            max-width: 960px;
+        }
+
+        /* ── LEFT COLUMN ── */
+        .left-col { display: flex; flex-direction: column; gap: 12px; }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 14px;
+        }
+        .card-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--muted);
+            margin-bottom: 12px;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Frequency Display */
+        .freq-display {
+            text-align: center;
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--accent);
+            font-family: 'Courier New', monospace;
+            letter-spacing: 2px;
+            padding: 10px 0 4px;
+        }
+        .freq-unit { font-size: 14px; color: var(--muted); font-weight: 400; }
+        .freq-signal {
+            text-align: center;
+            font-size: 11px;
+            color: var(--muted);
+            margin-top: 4px;
+            margin-bottom: 12px;
+        }
+
+        /* Play Button */
+        .circle-btn {
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            border: 2px solid var(--border);
+            background: var(--surface2);
+            color: var(--text);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+            flex-shrink: 0;
+        }
+        .circle-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .circle-btn.playing { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+        .circle-btn.active { background: var(--surface2); color: var(--accent); border-color: var(--accent); }
+        .circle-btn.error { background: var(--error); color: white; border-color: var(--error); }
+
+        /* Mode Badge */
+        .mode-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            margin-top: 8px;
+        }
+        .mode-badge.mono { background: var(--mono-badge); color: white; }
+        .mode-badge.wfm { background: var(--wfm-badge); color: white; }
+
+        /* Status */
+        .status-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--muted);
+        }
+        .status-dot {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            background: var(--border);
+            flex-shrink: 0;
+        }
+        .status-dot.ok { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+        .status-dot.error { background: var(--error); box-shadow: 0 0 6px var(--error); }
+        .status-dot.busy { background: var(--warn); }
+        .status-text { flex: 1; }
+        .status-val { color: var(--text); font-weight: 600; }
+
+        /* Log */
+        .log-box {
+            background: #0a0b0e;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            color: #555;
+            height: 140px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .log-box .log-line { line-height: 1.6; }
+        .log-box .log-error { color: var(--error); }
+        .log-box .log-warn { color: var(--warn); }
+        .log-box .log-ok { color: var(--accent); }
+
+        /* ── RIGHT COLUMN ── */
+        .right-col { display: flex; flex-direction: column; gap: 12px; }
+        .right-col .card:first-child { padding: 16px; }
+
+        /* Slider input */
+        .slider-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        .slider-row label { min-width: 70px; font-size: 12px; color: var(--muted); }
+        .slider-row input[type=range] { flex: 1; height: 6px; cursor: pointer; accent-color: var(--accent); }
+        .slider-row .val { min-width: 55px; text-align: right; color: var(--accent); font-size: 12px; font-weight: 600; }
+
+        /* Preset grid */
+        .presets-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 6px;
+            margin-top: 8px;
+        }
+        .preset-btn {
+            padding: 8px 4px;
+            font-size: 12px;
+            background: var(--surface2);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.15s;
+        }
+        .preset-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .preset-btn .scan-bars { font-size: 9px; color: var(--accent); letter-spacing: 1px; line-height: 1.1; }
+        .preset-btn .scan-db { font-size: 9px; color: var(--muted); }
+
+        /* Button groups */
+        .btn-group { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+        .btn-group button {
+            flex: 1; min-width: 70px;
+            padding: 9px 8px;
+            font-size: 12px;
+            background: var(--surface2);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .btn-group button:hover { border-color: var(--accent); color: var(--accent); }
+        .btn-group button.active { background: var(--accent); color: #111; border-color: var(--accent); font-weight: 600; }
+
+        /* Gain presets */
+        .gain-row { display: flex; gap: 6px; margin-top: 8px; }
+        .gain-row button {
+            flex: 1; padding: 7px 4px;
+            font-size: 11px;
+            background: var(--surface2);
+            color: var(--muted);
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .gain-row button:hover { border-color: var(--accent); color: var(--accent); }
+        .gain-row button.active { background: var(--accent); color: #111; border-color: var(--accent); }
+
+        /* Collapsible sections */
+        .section-toggle {
+            display: flex; align-items: center; justify-content: space-between;
+            cursor: pointer; padding: 4px 0;
+        }
+        .section-toggle h3 { margin: 0; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+        .section-toggle::after { content: '▼'; font-size: 9px; color: var(--muted); transition: transform 0.2s; }
+        .section-toggle.open::after { transform: rotate(180deg); }
+        .section-body { margin-top: 10px; }
+        .section-body.hidden { display: none; }
+
+        /* Section labels */
+        .sec { margin-bottom: 14px; }
+        .sec-label { font-size: 11px; color: var(--muted); margin-bottom: 6px; display: block; }
+
+        /* Divider */
+        .divider { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+
+        /* Audio element */
+        audio { width: 100%; margin-top: 6px; }
+
+        /* Scan button */
+        .scan-btn {
+            width: 100%;
+            padding: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            background: #1565c0;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            letter-spacing: 0.5px;
+            transition: background 0.2s;
+        }
+        .scan-btn:hover { background: #1976d2; }
+        .scan-btn.scanning { background: var(--warn); color: #111; cursor: default; }
+
+
+
+        /* Live scan station list (below progress bar) */
+        .scan-live-list {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            max-height: 220px;
+            overflow-y: auto;
+            margin-top: 6px;
+        }
+        .scan-live-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            padding: 3px 6px;
+            border-radius: 4px;
+            background: rgba(255,255,255,0.03);
+        }
+        .scan-live-item .freq { font-weight: 600; min-width: 80px; }
+        .scan-live-item .db { color: var(--muted); font-size: 11px; min-width: 60px; }
+        .scan-live-item .bars { color: #00e676; letter-spacing: 1px; }
+
+        /* Scan list (preset-btn grid) */
+        .scan-list {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 6px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        /* Drag and drop */
+        .edit-mode .preset-btn { cursor: grab; user-select: none; }
+        .edit-mode .preset-btn:active { cursor: grabbing; }
+        .drag-over { outline: 2px dashed var(--accent) !important; background: rgba(79,195,247,0.08) !important; }
+        .dragging { opacity: 0.35; }
+        /* Trash drop zone */
+        #trashZone {
+            display: none;
+            border: 2px dashed var(--error);
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+            color: var(--error);
+            font-size: 12px;
+            margin-top: 8px;
+            transition: all 0.15s;
+            cursor: default;
+        }
+        #trashZone.drag-over {
+            background: rgba(244, 67, 54, 0.15);
+            border-style: solid;
+        }
+        #trashZone svg { display: block; margin: 0 auto 4px; }
+        .drop-hint { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+        .scan-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 7px 10px;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.15s;
+        }
+        .scan-item:hover { border-color: var(--accent); }
+        .scan-item.selected { border-color: var(--accent); background: rgba(0,230,118,0.1); }
+        .scan-item .freq { font-weight: 600; color: var(--text); }
+        .scan-item .db { color: var(--muted); font-size: 11px; }
+        .scan-item .sig { color: var(--accent); font-size: 11px; }
+        .scan-item input[type=checkbox] { accent-color: var(--accent); }
+
+        /* Small buttons */
+        .btn-sm {
+            flex: 1;
+            padding: 8px 6px;
+            font-size: 12px;
+            background: var(--accent-dim);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-sm:hover { background: var(--accent); color: #111; }
+        .btn-sm.secondary { background: var(--surface2); color: var(--muted); }
+        .btn-sm.secondary:hover { border-color: var(--accent); color: var(--accent); }
+    </style>
+</head>
+<body>
+    <h1>📻 FM Radio Tuner</h1>
+
+    <div class="two-col">
+        <!-- ══ LEFT COLUMN ══ -->
+        <div class="left-col">
+            <div class="card">
+                <div class="card-title">▼ Now Playing</div>
+                <div class="freq-display" id="freqDisplay">99.1<span class="freq-unit"> MHz</span></div>
+                <div class="freq-signal" id="freqSignal">—</div>
+                <div style="display:flex;gap:10px;align-items:center;justify-content:center;margin:10px 0;">
+                    <button class="play-btn circle-btn" id="playBtn" onclick="startPlaying()" title="Play">
+<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><polygon points="6,4 6,20 18,12"/></svg>
+                </button>
+                <button class="play-btn circle-btn" id="pauseBtn" onclick="pausePlaying()" title="Pause">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><rect x="5" y="4" width="4" height="16"/><rect x="15" y="4" width="4" height="16"/></svg>
+                </button>
+                </div>
+                <div style="margin-top:10px; text-align:center;">
+                    <span class="mode-badge mono" id="modeBadge">Narrow FM · Mono</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">● Status</div>
+                <div class="status-row" style="margin-bottom:6px;">
+                    <div class="status-dot" id="streamDot"></div>
+                    <span class="status-text">Stream</span>
+                    <span class="status-val" id="streamStatus">Stopped</span>
+                </div>
+                <div class="status-row" style="margin-bottom:6px;">
+                    <div class="status-dot" id="deviceDot"></div>
+                    <span class="status-text">Device</span>
+                    <span class="status-val" id="deviceStatus">—</span>
+                </div>
+                <div class="status-row">
+                    <div class="status-dot" id="signalDot"></div>
+                    <span class="status-text">Signal</span>
+                    <span class="status-val" id="signalValue">—</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">☰ Recent Log</div>
+                <div class="log-box" id="logBox"><span class="log-line">Ready...</span></div>
+            </div>
+        </div>
+
+        <!-- ══ RIGHT COLUMN ══ -->
+        <div class="right-col">
+            <div class="card">
+                <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;"><span>📍 Tuning</span><a href="#" id="editBtn" onclick="toggleEditMode();return false;" style="font-size:12px;color:var(--accent);text-decoration:none;cursor:pointer;">✎ Edit</a></div>
+                <div class="slider-row">
+                    <label>Frequency</label>
+                    <input type="range" id="freqSlider" min="87.5" max="108.0" step="0.2" value="99.1">
+                    <span class="val" id="freqVal">99.1</span>
+                </div>
+                <div id="presetsDropHint" class="drop-hint" style="display:none;">Drop to add to presets</div>
+                <div class="presets-grid" id="presetsGrid">
+                    <!-- Loaded dynamically from /stations -->
+                </div>
+            </div>
+
+            <div class="card" id="scanCard">
+                <div class="card-title">🔍 Auto Scan</div>
+                <div id="scanPanel">
+                    <button class="scan-btn" id="scanBtn" onclick="startScan()">▶ Run FM Scan</button>
+                </div>
+                <div id="scanResults" style="display:none; margin-top:12px;">
+                    <div id="scanDropHint" class="drop-hint" style="display:none;">Drag stations to presets — or drop here to remove</div>
+                    <div style="font-size:11px;color:var(--muted);margin-bottom:8px;" id="scanTapHint">Tap frequencies to add to presets:</div>
+                    <div id="scanList" class="scan-list"></div>
+                    <div id="trashZone">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                        Drop here to delete
+                    </div>
+                    <div id="scanActionBtns" style="margin-top:10px; display:flex; gap:6px;">
+                        <button class="btn-sm" id="scanSaveBtn" onclick="confirmSaveStations()">Save to Presets</button>
+                        <button class="btn-sm secondary" onclick="closeScanResults()">Cancel</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="section-toggle open" onclick="toggleSection(this)"><h3>📡 Demodulation</h3></div>
+                <div class="section-body" id="demodSection">
+                    <div class="btn-group">
+                        <button id="narrowBtn" class="active" onclick="setDemod('narrow')">Narrow FM</button>
+                        <button id="wideBtn" onclick="setDemod('wide')">Wideband FM</button>
+                        <button id="wideAltBtn" onclick="setDemod('wide_alt')">Wide + Alt</button>
+                    </div>
+                    <small style="color:#555;font-size:11px;display:block;margin-top:8px;">
+                        Narrow = default · Wideband = better multipath · Wide + Alt = alternate
+                    </small>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="section-toggle open" onclick="toggleSection(this)"><h3>🎧 Audio Mode</h3></div>
+                <div class="section-body" id="audioSection">
+                    <div class="btn-group">
+                        <button id="monoBtn" class="active" onclick="setMode('mono')">📶 Mono</button>
+                        <button id="stereoBtn" onclick="setMode('stereo')">🎵 Wide FM</button>
+                    </div>
+                    <small style="color:#555;font-size:11px;display:block;margin-top:8px;">
+                        Mono = clean narrow-band signal · Wide FM = wider bandwidth (L/R info not available with this hardware)
+                    </small>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="section-toggle" onclick="toggleSection(this)"><h3>🔧 Filters & Levels</h3></div>
+                <div class="section-body hidden" id="filtersSection">
+                    <!-- Low-pass -->
+                    <div class="sec">
+                        <span class="sec-label">Low-Pass Filter</span>
+                        <div class="btn-group" style="margin-bottom:8px;">
+                            <button id="lpOffBtn" onclick="setLP(false)">Off</button>
+                            <button id="lpOnBtn" class="active" onclick="setLP(true)">On</button>
+                        </div>
+                        <div class="slider-row">
+                            <label>Cutoff</label>
+                            <input type="range" id="lpSlider" min="5" max="20" step="0.5" value="12" oninput="updateLP(this.value)">
+                            <span class="val" id="lpVal">12.0 kHz</span>
+                        </div>
+                    </div>
+                    <hr class="divider">
+                    <!-- De-emphasis -->
+                    <div class="sec">
+                        <span class="sec-label">De-emphasis</span>
+                        <div class="btn-group">
+                            <button id="deemphRtlBtn" class="active" onclick="setDeemph('rtl')">RTL Built-in</button>
+                            <button id="deemphSoxBtn" onclick="setDeemph('sox')">Sox Deemph</button>
+                        </div>
+                    </div>
+                    <hr class="divider">
+                    <!-- Input Level -->
+                    <div class="sec">
+                        <span class="sec-label">Input Level (sox)</span>
+                        <div class="slider-row">
+                            <label>Level</label>
+                            <input type="range" id="inputSlider" min="0.1" max="1.5" step="0.05" value="1.0" oninput="updateInput(this.value)">
+                            <span class="val" id="inputVal">1.00</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="section-toggle" onclick="toggleSection(this)"><h3>🎚️ Gain & Squelch</h3></div>
+                <div class="section-body hidden" id="gainSection">
+                    <div class="slider-row">
+                        <label>Gain</label>
+                        <input type="range" id="gainSlider" min="0" max="70" step="10" value="40" oninput="updateGain(this.value)">
+                        <span class="val" id="gainVal">40 dB</span>
+                    </div>
+                    <div class="gain-row">
+                        <button onclick="setGainVal('auto')">Auto</button>
+                        <button onclick="setGainVal(20)">20</button>
+                        <button onclick="setGainVal(30)">30</button>
+                        <button onclick="setGainVal(40)" class="active" id="gainBtn40">40</button>
+                        <button onclick="setGainVal(50)">50</button>
+                        <button onclick="setGainVal(60)">60</button>
+                        <button onclick="setGainVal(70)">70</button>
+                    </div>
+                    <hr class="divider">
+                    <div class="slider-row">
+                        <label>Squelch</label>
+                        <input type="range" id="sqSlider" min="0" max="200" step="10" value="0" oninput="updateSq(this.value)">
+                        <span class="val" id="sqVal">Off</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">🔊 Audio Output</div>
+                <audio id="player" id="audioPlayer" controls>
+                    <source src="/stream" type="audio/wav">
+                </audio>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ── State ── $
+        let playMode = 'paused';  // 'stopped' | 'playing' | 'paused'
+        let editMode = false;          // drag-and-drop edit mode
+        let presetStations = [];       // current presets (for drag-drop)
+        let scanStations = [];         // current scan results (for drag-drop)
+        let dragSrc = null;            // {el, freq, list} — what's being dragged
+        let currentFreq = 99.1;
+        let currentGain = 40;
+        let currentGainAuto = false;
+        let currentSq = 0;
+        let currentLp = true;
+        let currentLpFreq = 15000;
+        let currentMode = 'mono';
+        let currentDemod = 'narrow';
+        let currentDeemph = 'rtl';
+        let currentInput = 1.0;
+        let retuneTimer = null;
+        let logLines = [];
+        const MAX_LOG = 20;
+
+        const player = document.getElementById('player');
+        const logBox = document.getElementById('logBox');
+
+
+        // ── Edit / Drag-and-drop mode ──
+        function toggleEditMode() {
+            editMode = !editMode;
+            const editBtn = document.getElementById('editBtn');
+            const tuningCard = document.querySelector('.right-col .card:first-child');
+            const scanResultsEl = document.getElementById('scanResults');
+            const presetsHint = document.getElementById('presetsDropHint');
+            const scanHint = document.getElementById('scanDropHint');
+            const scanTapHint = document.getElementById('scanTapHint');
+            const scanSaveBtn = document.getElementById('scanSaveBtn');
+            const scanListEl = document.getElementById('scanList');
+            const presetsGridEl = document.getElementById('presetsGrid');
+
+            if (editMode) {
+                editBtn.textContent = '✓ Done';
+                editBtn.classList.add('active');
+                tuningCard.classList.add('edit-mode');
+                if (scanResultsEl.style.display !== 'none') scanResultsEl.classList.add('edit-mode');
+                if (presetsHint) presetsHint.style.display = 'block';
+                if (scanHint) scanHint.style.display = 'block';
+                if (scanTapHint) scanTapHint.style.display = 'none';
+                if (scanSaveBtn) scanSaveBtn.style.display = 'none';
+                // Make presets grid a drop zone
+                if (presetsGridEl) {
+                    presetsGridEl.ondragover = onDragOver;
+                    presetsGridEl.ondragleave = onDragLeave;
+                    presetsGridEl.ondrop = onDropPreset;
+                }
+                // Make scan list a drop zone (remove from presets)
+                if (scanListEl) {
+                    scanListEl.ondragover = onDragOver;
+                    scanListEl.ondragleave = onDragLeave;
+                    scanListEl.ondrop = onDropScan;
+                }
+                // Show and activate trash zone
+                const trashZone = document.getElementById('trashZone');
+                if (trashZone) {
+                    trashZone.style.display = 'block';
+                    trashZone.ondragover = onDragOver;
+                    trashZone.ondragleave = onDragLeave;
+                    trashZone.ondrop = onDropTrash;
+                }
+            } else {
+                editBtn.textContent = '✎ Edit';
+                editBtn.classList.remove('active');
+                tuningCard.classList.remove('edit-mode');
+                scanResultsEl.classList.remove('edit-mode');
+                if (presetsHint) presetsHint.style.display = 'none';
+                if (scanHint) scanHint.style.display = 'none';
+                if (scanTapHint) scanTapHint.style.display = 'block';
+                if (scanSaveBtn) scanSaveBtn.style.display = '';
+            }
+            // Re-render both lists with/without drag attrs
+            renderPresets();
+            renderScanResults();
+        }
+
+        function renderPresets() {
+            const grid = document.getElementById('presetsGrid');
+            if (!grid) return;
+            const DB_SCL_MIN = 5, DB_SCL_MAX = 23;
+            const barChars = '\u2581\u2582\u2583\u2584\u2585\u2586\u2587\u2588';
+            grid.innerHTML = presetStations.map(s => {
+                const dbEst = DB_SCL_MIN + ((s.signal - 1) / 4) * (DB_SCL_MAX - DB_SCL_MIN);
+                const barCount = Math.max(0, Math.min(8, Math.round(((dbEst - DB_SCL_MIN) / (DB_SCL_MAX - DB_SCL_MIN)) * 8)));
+                const dragAttrs = editMode ? ` draggable="true" ondragstart="onDragStart(event,'preset',${s.frequency})" ondragend="onDragEnd(event)"` : '';
+                const onclick = editMode ? '' : `onclick="tunePreset(${s.frequency})"`;
+                return `<button class="preset-btn" ${onclick} ${dragAttrs}>
+                    ${s.frequency}
+                    <div class="scan-bars">${barChars.slice(0, barCount)}</div>
+                    <div class="scan-db">${dbEst >= 0 ? '+' : ''}${dbEst.toFixed(0)} dB</div>
+                </button>`;
+            }).join('');
+        }
+
+        function renderScanResults() {
+            const list = document.getElementById('scanList');
+            if (!list) return;
+            const DB_SCL_MIN = 5, DB_SCL_MAX = 23;
+            list.innerHTML = scanStations.map(s => {
+                const barCount = Math.max(0, Math.min(8, Math.round(((s.db - DB_SCL_MIN) / (DB_SCL_MAX - DB_SCL_MIN)) * 8)));
+                const barChars = '\u2581\u2582\u2583\u2584\u2585\u2586\u2587\u2588';
+                const dragAttrs = editMode ? ` draggable="true" ondragstart="onDragStart(event,'scan',${s.frequency})" ondragend="onDragEnd(event)"` : '';
+                return `<button class="preset-btn" ${dragAttrs}>
+                    ${Number(s.frequency).toFixed(1)}
+                    <div class="scan-bars">${barChars.slice(0, barCount)}</div>
+                    <div class="scan-db">${s.db > 0 ? '+' : ''}${s.db} dB</div>
+                </button>`;
+            }).join('');
+        }
+
+        function onDragStart(e, source, freq) {
+            dragSrc = { el: e.target.closest('.preset-btn'), freq, list: source };
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', String(freq));
+            setTimeout(() => e.target.closest('.preset-btn').classList.add('dragging'), 0);
+        }
+
+        function onDragEnd(e) {
+            e.target.closest('.preset-btn').classList.remove('dragging');
+            document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+            dragSrc = null;
+        }
+
+        function onDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            const el = e.target.closest('.preset-btn, .presets-grid, .scan-list');
+            if (el) el.classList.add('drag-over');
+        }
+
+        function onDragLeave(e) {
+            const el = e.target.closest('.preset-btn, .presets-grid, .scan-list');
+            if (el && !el.contains(e.relatedTarget)) el.classList.remove('drag-over');
+        }
+
+        function onDropPreset(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+            if (!dragSrc) return;
+            const { freq, list } = dragSrc;
+
+            if (list === 'scan') {
+                // Move from scan → presets
+                const station = scanStations.find(s => s.frequency === freq);
+                if (station && !presetStations.find(s => s.frequency === freq)) {
+                    // Convert scan station to preset format (signal=3 default)
+                    presetStations.push({ frequency: station.frequency, name: station.frequency + ' FM', signal: 3 });
+                    presetStations.sort((a, b) => a.frequency - b.frequency);
+                    scanStations = scanStations.filter(s => s.frequency !== freq);
+                    savePresets();
+                    renderPresets();
+                    renderScanResults();
+                    addLog(`Added ${freq} MHz to presets`, 'log-ok');
+                }
+            } else if (list === 'preset') {
+                // Reorder within presets — use elementFromPoint to find the actual button under cursor
+                const dropEl = document.elementFromPoint(e.clientX, e.clientY);
+                const targetBtn = dropEl ? dropEl.closest('.preset-btn') : null;
+                if (targetBtn) {
+                    const targetFreq = parseFloat(targetBtn.textContent);
+                    const fromIdx = presetStations.findIndex(s => s.frequency === freq);
+                    const toIdx = presetStations.findIndex(s => s.frequency === targetFreq);
+                    if (fromIdx !== -1 && toIdx !== -1 && fromIdx !== toIdx) {
+                        const [item] = presetStations.splice(fromIdx, 1);
+                        // insert before target if dropping in first half of target, else after
+                        const rect = targetBtn.getBoundingClientRect();
+                        const midY = rect.top + rect.height / 2;
+                        const insertAt = e.clientY < midY ? toIdx : toIdx + 1;
+                        const finalIdx = insertAt > fromIdx ? insertAt - 1 : insertAt;
+                        presetStations.splice(finalIdx, 0, item);
+                        savePresets();
+                        renderPresets();
+                        addLog(`Moved ${freq} MHz`, 'log-ok');
+                        return;
+                    }
+                }
+                // Dropped on empty area: append at end (no-op for same position)
+                if (fromIdx !== -1) {
+                    savePresets();
+                    renderPresets();
+                }
+            }
+        }
+
+        function onDropScan(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+            if (!dragSrc) return;
+            const { freq, list } = dragSrc;
+
+            if (list === 'preset') {
+                // Move from presets → scan (remove from presets, add to scan)
+                const station = presetStations.find(s => s.frequency === freq);
+                if (station) {
+                    // Convert preset to scan format (use saved signal as proxy for db)
+                    const DB_SCL_MIN = 5, DB_SCL_MAX = 23;
+                    const dbEst = DB_SCL_MIN + ((station.signal - 1) / 4) * (DB_SCL_MAX - DB_SCL_MIN);
+                    scanStations.push({ frequency: station.frequency, db: Math.round(dbEst) });
+                    scanStations.sort((a, b) => a.frequency - b.frequency);
+                    presetStations = presetStations.filter(s => s.frequency !== freq);
+                    savePresets();
+                    renderPresets();
+                    renderScanResults();
+                    addLog(`Removed ${freq} MHz from presets`, 'log-warn');
+                }
+            }
+            // Dropping on scan list from scan list = no-op (already there)
+        }
+
+        function onDropTrash(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+            if (!dragSrc) return;
+            const { freq, list } = dragSrc;
+            if (list === 'preset') {
+                presetStations = presetStations.filter(s => s.frequency !== freq);
+                savePresets();
+                renderPresets();
+                addLog(`Deleted ${freq} MHz from presets`, 'log-warn');
+            } else if (list === 'scan') {
+                scanStations = scanStations.filter(s => s.frequency !== freq);
+                renderScanResults();
+                addLog(`Deleted ${freq} MHz from scan`, 'log-warn');
+            }
+        }
+
+        async function savePresets() {
+            await fetch('/save_stations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(presetStations)
+            }).catch(() => {});
+        }
+
+        // ── Load stations from API ── $
+        async function loadStations() {
+            try {
+                const r = await fetch('/stations');
+                const stations = await r.json();
+                presetStations = stations.slice();
+                renderPresets();
+            } catch(e) {
+                const grid = document.getElementById('presetsGrid');
+                if (grid) grid.innerHTML = '<span style="color:#f44336;font-size:11px;">Failed to load stations</span>';
+            }
+        }
+        loadStations();
+
+        // ── Logging ── $
+        function addLog(msg, cls='') {
+            const line = { msg, cls };
+            logLines.push(line);
+            if (logLines.length > MAX_LOG) logLines.shift();
+            logBox.innerHTML = logLines.map(l =>
+                `<div class="log-line${l.cls ? ' '+l.cls : ''}">${l.msg}</div>`
+            ).join('');
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        // ── Status ── $
+        function setStreamDot(cls, txt) {
+            document.getElementById('streamDot').className = 'status-dot '+cls;
+            document.getElementById('streamStatus').textContent = txt;
+        }
+        function setDeviceDot(cls, txt) {
+            document.getElementById('deviceDot').className = 'status-dot '+cls;
+            document.getElementById('deviceStatus').textContent = txt;
+        }
+        function setSignal(cls, val) {
+            document.getElementById('signalDot').className = 'status-dot '+cls;
+            document.getElementById('signalValue').textContent = val;
+        }
+        function setModeText() {
+            const badge = document.getElementById('modeBadge');
+            if (currentDemod === 'narrow') {
+                badge.textContent = 'Narrow FM · Mono';
+                badge.className = 'mode-badge mono';
+            } else {
+                badge.textContent = 'Wide FM · Mono';
+                badge.className = 'mode-badge wfm';
+            }
+        }
+        player.addEventListener('error', () => {
+            addLog('Player error — check console', 'log-error');
+            setStreamDot('error', 'Error');
+            document.getElementById('playBtn').classList.add('error');
+            document.getElementById('pauseBtn').classList.add('error');
+        });
+        player.addEventListener('stalled', () => {
+            addLog('Stream stalled — rebuffering', 'log-warn');
+            setStreamDot('busy', 'Buffering');
+        });
+        player.addEventListener('playing', () => {
+            addLog('Streaming audio', 'log-ok');
+            setStreamDot('ok', 'Active');
+            document.getElementById('playBtn').classList.remove('error');
+ document.getElementById('pauseBtn').classList.remove('error');
+        });
+        player.addEventListener('waiting', () => {
+            setStreamDot('busy', 'Buffering');
+        });
+        player.addEventListener('pause', () => {
+            if (playMode === 'playing') return;  // ignore buffering pauses
+            setStreamDot('', 'Paused');
+            updatePlayPauseButtons();
+            addLog('Playback paused');
+        });
+
+        // ── Playback ── $
+
+        // ── Stream from a given frequency ── $
+        function startStreamAt(freq) {
+            currentFreq = freq;
+            document.getElementById('freqSlider').value = freq;
+            document.getElementById('freqDisplay').innerHTML = freq.toFixed(1) + '<span class="freq-unit"> MHz</span>';
+            document.getElementById('freqVal').textContent = freq.toFixed(1);
+            scheduleRetune();
+        }
+
+        // ── Update play/pause button active states from current playMode ──
+        function updatePlayPauseButtons() {
+            const playBtn = document.getElementById('playBtn');
+            const pauseBtn = document.getElementById('pauseBtn');
+            if (!playBtn || !pauseBtn) return;
+            playBtn.classList.remove('playing', 'active');
+            pauseBtn.classList.remove('playing', 'active');
+            if (playMode === 'playing') {
+                playBtn.classList.add('playing');
+            } else if (playMode === 'paused') {
+                pauseBtn.classList.add('active');
+            }
+        }
+
+        function startPlaying() {
+            clearTimeout(retuneTimer);
+            doRetune().then(() => {
+                player.load();
+                player.play().then(() => {
+                    playMode = 'playing';
+                    updatePlaybackUI();
+                    setStreamDot('busy', 'Starting');
+                    document.getElementById('freqSignal').textContent = `${currentFreq} MHz · tuning`;
+                    setDeviceDot('ok', 'FM-RADIO');
+                }).catch(e => {
+                    addLog('Play failed: ' + e.message, 'log-error');
+                    setStreamDot('error', 'Failed');
+                    playMode = 'stopped';
+                    updatePlaybackUI();
+                });
+            }).catch(() => {});
+        }
+
+        function pausePlaying() {
+            clearTimeout(retuneTimer);
+            player.pause();
+            playMode = 'paused';
+            updatePlaybackUI();
+            setStreamDot('', 'Paused');
+            document.getElementById('freqSignal').textContent = `${currentFreq} MHz · paused`;
+        }
+
+        function updatePlaybackUI() {
+            const playBtn = document.getElementById('playBtn');
+            const pauseBtn = document.getElementById('pauseBtn');
+            if (playMode === 'playing') {
+                playBtn.classList.add('playing');
+                pauseBtn.classList.remove('active');
+            } else {
+                playBtn.classList.remove('playing');
+ }
+            if (playMode === 'paused') {
+                pauseBtn.classList.add('active');
+                playBtn.classList.remove('playing');
+            } else {
+                pauseBtn.classList.remove('active');
+            }
+        }
+
+        async function doRetune() {
+            addLog(`Tuning ${currentFreq} MHz...`);
+            const body = {
+                frequency: currentFreq,
+                gain: currentGainAuto ? 'auto' : currentGain,
+                squelch: currentSq,
+                stereo: currentMode === 'stereo',
+                demod_mode: currentDemod,
+                input_level: currentInput,
+                use_sox_deemph: currentDeemph === 'sox',
+                lowpass_enabled: currentLp,
+                lowpass_freq: currentLpFreq,
+            };
+            try {
+                const r = await fetch('/tune', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(body)
+                });
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                addLog(`Tuned to ${currentFreq} MHz`);
+            } catch(e) {
+                addLog('Tune error: ' + e.message, 'log-error');
+                throw e;
+            }
+        }
+
+        // ── Frequency ── $
+        function tunePreset(freq) {
+            currentFreq = freq;
+            document.getElementById('freqSlider').value = freq;
+            document.getElementById('freqDisplay').innerHTML = freq.toFixed(1) + '<span class="freq-unit"> MHz</span>';
+            document.getElementById('freqVal').textContent = freq;
+            scheduleRetune();
+        }
+
+        document.getElementById('freqSlider').oninput = function() {
+            currentFreq = parseFloat(this.value);
+            document.getElementById('freqDisplay').innerHTML = currentFreq.toFixed(1) + '<span class="freq-unit"> MHz</span>';
+            document.getElementById('freqVal').textContent = currentFreq.toFixed(1);
+        };
+        document.getElementById('freqSlider').onchange = scheduleRetune;
+
+        function scheduleRetune() {
+            clearTimeout(retuneTimer);
+            retuneTimer = setTimeout(() => {
+                if (playMode === 'playing') {
+                    // Stop → retune → restart
+                    player.pause();
+                    doRetune().then(() => {
+                        document.getElementById('freqSignal').textContent = `${currentFreq} MHz`;
+                        player.load();
+                        player.play().then(() => {
+                            setStreamDot('ok', 'Active');
+                        }).catch(e => {
+                            addLog('Resume failed: ' + e.message, 'log-error');
+                            setStreamDot('error', 'Failed');
+                        });
+                    }).catch(e => {
+                        addLog('Tune error: ' + e.message, 'log-error');
+                    });
+                } else if (playMode === 'paused') {
+                    // Just retune; don't restart
+                    doRetune().then(() => {
+                        document.getElementById('freqSignal').textContent = `${currentFreq} MHz · paused`;
+                    }).catch(e => {
+                        addLog('Tune error: ' + e.message, 'log-error');
+                    });
+                } else {
+                    // stopped — retune only
+                    doRetune().then(() => {
+                        document.getElementById('freqSignal').textContent = `${currentFreq} MHz`;
+                    }).catch(e => {
+                        addLog('Tune error: ' + e.message, 'log-error');
+                    });
+                }
+            }, 400);
+        }
+
+        // ── Demod ── $
+        function setDemod(mode) {
+            currentDemod = mode;
+            document.getElementById('narrowBtn').classList.toggle('active', mode==='narrow');
+            document.getElementById('wideBtn').classList.toggle('active', mode==='wide');
+            document.getElementById('wideAltBtn').classList.toggle('active', mode==='wide_alt');
+            setModeText();
+            scheduleRetune();
+        }
+
+        // ── Audio Mode ── $
+        function setMode(mode) {
+            currentMode = mode;
+            document.getElementById('monoBtn').classList.toggle('active', mode==='mono');
+            document.getElementById('stereoBtn').classList.toggle('active', mode==='stereo');
+            scheduleRetune();
+        }
+
+        // ── De-emph ── $
+        function setDeemph(mode) {
+            currentDeemph = mode;
+            document.getElementById('deemphRtlBtn').classList.toggle('active', mode==='rtl');
+            document.getElementById('deemphSoxBtn').classList.toggle('active', mode==='sox');
+            scheduleRetune();
+        }
+
+        // ── Low-pass ── $
+        function setLP(enabled) {
+            currentLp = enabled;
+            document.getElementById('lpOffBtn').classList.toggle('active', !enabled);
+            document.getElementById('lpOnBtn').classList.toggle('active', enabled);
+            document.getElementById('lpSlider').disabled = !enabled;
+            scheduleRetune();
+        }
+        function updateLP(val) {
+            currentLpFreq = Math.round(val * 1000);
+            document.getElementById('lpVal').textContent = parseFloat(val).toFixed(1) + ' kHz';
+            scheduleRetune();
+        }
+
+        // ── Input level ── $
+        function updateInput(val) {
+            currentInput = parseFloat(val);
+            document.getElementById('inputVal').textContent = parseFloat(val).toFixed(2);
+            scheduleRetune();
+        }
+
+        // ── Gain ── $
+        function updateGain(val) {
+            currentGain = parseInt(val);
+            document.getElementById('gainVal').textContent = val + ' dB';
+            scheduleRetune();
+        }
+        function setGainVal(val) {
+            if (val === 'auto') {
+                currentGain = 'auto'; currentGainAuto = true;
+                document.getElementById('gainVal').textContent = 'Auto';
+                document.getElementById('gainSlider').disabled = true;
+            } else {
+                currentGain = val; currentGainAuto = false;
+                document.getElementById('gainVal').textContent = val + ' dB';
+                document.getElementById('gainSlider').value = val;
+                document.getElementById('gainSlider').disabled = false;
+            }
+            document.querySelectorAll('.gain-row button').forEach(b => b.classList.remove('active'));
+            if (val === 'auto') document.querySelector('.gain-row button:nth-child(1)').classList.add('active');
+            else if (val === 40) document.getElementById('gainBtn40').classList.add('active');
+            scheduleRetune();
+        }
+
+        // ── Squelch ── $
+        function updateSq(val) {
+            currentSq = parseInt(val);
+            document.getElementById('sqVal').textContent = val == 0 ? 'Off' : val;
+            scheduleRetune();
+        }
+
+        // ── Collapsible ── $
+        function toggleSection(el) {
+            el.classList.toggle('open');
+            const body = el.nextElementSibling;
+            body.classList.toggle('hidden');
+        }
+
+        // ── Log polling ── $
+        async function pollLog() {
+            try {
+                const r = await fetch('/log');
+                if (r.ok) {
+                    const txt = await r.text();
+                    if (txt && txt !== logCache) {
+                        logCache = txt;
+                        addLog('--- server log ---', 'log-warn');
+                        txt.split('\n').filter(Boolean).slice(-8).forEach(l => {
+                            const cls = l.startsWith('!') ? 'log-error' : l.includes('error','fail','Error','Fail') ? 'log-error' : l.includes('WARN','warn') ? 'log-warn' : l.includes('restart','success','ok','Watchdog') ? 'log-ok' : '';
+                            addLog(l.replace(/^---.*?---/, '').trim(), cls);
+                        });
+                    }
+                }
+            } catch(e) {}
+        }
+        let logCache = '';
+
+        // ── Scan ── $
+        const DB_MIN = 5;
+        const DB_MAX = 23;
+        const DB_RANGE = DB_MAX - DB_MIN;
+        let scanPollTimer = null;
+        let scanSelected = [];
+
+        function startScan() {
+
+            if (scanPollTimer) return;
+            scanSelected = [];
+            const btn = document.getElementById('scanBtn');
+            btn.classList.add('scanning');
+            btn.textContent = 'Scanning...';
+            document.getElementById('scanPanel').innerHTML = `
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                    <span id="scanSpinner" style="display:none;">
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style="animation:spin 1s linear infinite;">
+                            <circle cx="7" cy="7" r="5.5" stroke="#4fc3f7" stroke-width="1.5" stroke-dasharray="20 15" stroke-linecap="round"/>
+                        </svg>
+                    </span>
+                    <span id="scanStatus" style="font-size:12px;color:var(--muted);"></span>
+                </div>
+                <div id="scanLiveList" class="scan-live-list"></div>
+            `;
+            document.getElementById('scanResults').style.display = 'none';
+            const liveEl = document.getElementById('scanLiveList');
+            if (liveEl) liveEl.style.display = 'block';
+            fetch('/scan', {method:'POST'}).catch(()=>{});
+            scanPollTimer = setInterval(pollScan, 2000);
+        }
+
+        
+        async function pollScan() {
+            try {
+                const text = await fetch('/scan_status').then(r => r.text());
+                const d = JSON.parse(text);
+
+                const spinner = document.getElementById('scanSpinner');
+                const status = document.getElementById('scanStatus');
+                const liveStatus = document.getElementById('scanLiveStatus');
+
+                if (d.active) {
+                    if (spinner) spinner.style.display = 'inline';
+                    if (status) {
+                        const n = d.stations ? d.stations.length : 0;
+                        status.textContent = n + ' station' + (n !== 1 ? 's' : '') + ' found';
+                    }
+                    if (liveStatus) {
+                        liveStatus.style.display = 'block';
+                        liveStatus.textContent = 'Scanning FM band...';
+                    }
+                } else {
+                    if (spinner) spinner.style.display = 'none';
+                    if (status) {
+                        const n = d.stations ? d.stations.length : 0;
+                        status.textContent = n + ' station' + (n !== 1 ? 's' : '') + ' found';
+                    }
+                    if (liveStatus) liveStatus.style.display = 'none';
+                    if (scanPollTimer) {
+                        clearInterval(scanPollTimer);
+                        scanPollTimer = null;
+                    }
+                    const btn = document.getElementById('scanBtn');
+                    if (btn) {
+                        btn.classList.remove('scanning');
+                        btn.textContent = '✓ Scan Complete';
+                    }
+                    showScanResults();
+                }
+            } catch(e) {}
+        }
+
+        
+        async function showScanResults() {
+            console.log("showScanResults CALLED!");
+            try {
+                const r = await fetch('/scan_results');
+                if (!r.ok) return;
+                const stations = await r.json();
+                if (!stations || !stations.length) return;
+                const DB_SCL_MIN = 5, DB_SCL_MAX = 23;
+                const signals = ['☆','★','★★','★★★','★★★★','★★★★★'];
+                scanSelected = stations.slice(0, 10).map(s => s.frequency);
+                const list = document.getElementById('scanList');
+                scanStations = stations.slice(0, 20);
+                list.innerHTML = stations.slice(0, 20).map(s => {
+                    const barCount = Math.max(0, Math.min(8, Math.round(((s.db - DB_SCL_MIN) / (DB_SCL_MAX - DB_SCL_MIN)) * 8)));
+                    const barChars = '\u2581\u2582\u2583\u2584\u2585\u2586\u2587\u2588';
+                    const dragAttrs = editMode ? ` draggable="true" ondragstart="onDragStart(event,'scan',${s.frequency})" ondragend="onDragEnd(event)"` : '';
+                    return `<button class="preset-btn"${dragAttrs}>
+                        ${Number(s.frequency).toFixed(1)}
+                        <div class="scan-bars">${barChars.slice(0, barCount)}</div>
+                        <div class="scan-db">${s.db > 0 ? '+' : ''}${s.db} dB</div>
+                    </button>`;
+                }).join('');
+                document.getElementById('scanResults').style.display = 'block';
+            } catch(e) { console.error(e); }
+        }
+
+
+
+        function toggleScanItem(el, freq) {
+            if (el.classList.contains('selected')) {
+                el.classList.remove('selected');
+                el.querySelector('input').checked = false;
+                scanSelected = scanSelected.filter(f => f !== freq);
+            } else {
+                el.classList.add('selected');
+                el.querySelector('input').checked = true;
+                scanSelected.push(freq);
+            }
+        }
+
+        async function confirmSaveStations() {
+            if (!scanSelected.length) return;
+            const current = await fetch('/stations').then(r => r.json()).catch(()=>[]);
+            const existing = new Set(current.map(s => s.frequency));
+            const newStations = current.slice();
+            scanSelected.forEach(freq => {
+                const rounded = Math.round(freq * 10) / 10;
+                if (!existing.has(rounded)) {
+                    newStations.push({frequency: rounded, name: rounded + ' FM', signal: 3});
+                }
+            });
+            await fetch('/save_stations', {
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body: JSON.stringify(newStations)
+            });
+            scanSelected = [];
+            closeScanResults();
+            loadStations();
+        }
+
+        function closeScanResults() {
+            document.getElementById('scanResults').style.display = 'none';
+            scanStations = [];
+            const panel = document.getElementById('scanPanel');
+            panel.innerHTML = '<button class="scan-btn" id="scanBtn" onclick="startScan()">▶ Run FM Scan</button>';
+        }
+
+        // ── Init ── $
+        setDeviceDot('', '—');
+        setModeText();
+        addLog('UI ready. Click ▶ to start.');
+        setInterval(pollLog, 4000);
+    </script>
+</body>
+</html>

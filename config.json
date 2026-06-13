@@ -1,0 +1,16 @@
+{
+  "device": "FM-RADIO",
+  "port": 8081,
+  "host": "0.0.0.0",
+  "log_dir": "/tmp",
+  "defaults": {
+    "frequency": 99.1,
+    "gain": 20,
+    "squelch": 0,
+    "demod_mode": "narrow",
+    "input_level": 1.0,
+    "use_sox_deemph": false,
+    "lowpass_enabled": true,
+    "lowpass_freq": 15000
+  }
+}

@@ -1,0 +1,52 @@
+[
+  {
+    "frequency": 94.9,
+    "name": "94.9 FM",
+    "signal": 4
+  },
+  {
+    "frequency": 88.9,
+    "name": "88.9 FM",
+    "signal": 4
+  },
+  {
+    "frequency": 100.7,
+    "name": "100.7 FM",
+    "signal": 3
+  },
+  {
+    "frequency": 106.9,
+    "name": "106.9 FM",
+    "signal": 4
+  },
+  {
+    "frequency": 97.5,
+    "name": "97.5 FM",
+    "signal": 3
+  },
+  {
+    "frequency": 102.5,
+    "name": "102.5 FM",
+    "signal": 3
+  },
+  {
+    "frequency": 96.7,
+    "name": "96.7 FM",
+    "signal": 3
+  },
+  {
+    "frequency": 88,
+    "name": "88.0 FM",
+    "signal": 2
+  },
+  {
+    "frequency": 105.6,
+    "name": "105.6 FM",
+    "signal": 2
+  },
+  {
+    "frequency": 99.1,
+    "name": "99.1 FM",
+    "signal": 5
+  }
+]
