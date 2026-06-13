@@ -1,6 +1,8 @@
 # FM Radio Tuner
 
-Super simple networked FM radio receiver built on a Raspberry Pi with an RTL-SDR Blog v4 dongle. Streams local FM stations over HTTP with a web interface and REST API. Totally vibe-coded. 
+Super simple networked FM radio receiver built on a Raspberry Pi with an RTL-SDR Blog v4 dongle. Streams local FM stations over HTTP with a web interface and REST API. Totally vibe-coded.
+
+![FM Radio Tuner UI](ui-screenshot.png) 
 
 ---
 
